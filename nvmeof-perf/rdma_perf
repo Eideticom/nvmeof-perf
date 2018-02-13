@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+########################################################################
+##
+## Copyright 2015 PMC-Sierra, Inc.
+## Copyright 2018 Eidetic Communications Inc.
+##
+## Licensed under the Apache License, Version 2.0 (the "License"); you
+## may not use this file except in compliance with the License. You may
+## obtain a copy of the License at
+## http://www.apache.org/licenses/LICENSE-2.0 Unless required by
+## applicable law or agreed to in writing, software distributed under the
+## License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+## CONDITIONS OF ANY KIND, either express or implied. See the License for
+## the specific language governing permissions and limitations under the
+## License.
+##
+########################################################################
+
+########################################################################
+##
+##   Author: Logan Gunthorpe
+##
+##   Description:
+##     This script runs perftest tools with mbw in the background to
+##     measure the memory bandwidth effects of using P2P RDMA transfers.
+##
+########################################################################
+
+import fio
+import ibperftest
+import mbw
+import proc
+from suffix import parse_suffix, Suffix
+
+import os
+import sys
+import errno
+import getpass
+
+def run_test(client="flash-rdma", size=8388608, duration=5, mmap=None,
+             socket=0, log_file=None, client_log_file=None, verbose=False,
+             perftest="ib_write_bw", test_args=[], **kwargs):
+
+    lmbw = mbw.LikwidMBWRunner(cpu="S{}:1".format(socket),
+                               log_file=log_file)
+
+    Server = ibperftest.LikwidPerfTestServer
+    Client = ibperftest.PerfTestClient
+
+    if perftest.startswith("fio"):
+        Server = fio.LikwidFioServer
+        Client = fio.FioClient
+
+    server = Server(print_output=verbose,
+                    cpu="S{}:0".format(socket), mbw=lmbw,
+                    block_size=size, duration=duration, mmap=mmap,
+                    log_file=log_file,
+                    command=perftest,
+                    test_args=test_args)
+
+    client = Client(host=client, block_size=size, duration=duration,
+                    command=perftest, wait_for=True,
+                    log_file=client_log_file,
+                    test_args=test_args)
+
+    with lmbw, server, client:
+        pass
+
+    server.calculate_results(duration=duration)
+    client.calculate_results(duration=duration)
+
+    return {"rdma_bw": server.bandwidth() or client.bandwidth(),
+            "rdma_lat": server.latency() or client.latency(),
+            "rdma_vol": server.volume() or client.volume(),
+            "mbw_stats": server.mbw_stats,
+            "likwid_stats": server.likwid_stats,
+            "likwid_units": server.likwid_units,
+            "server_time": server.time_stats,
+            "client_time": client.time_stats}
+
+def print_results(results, indent=0):
+    results["ind"] = " "*indent
+    tmpl = ""
+
+    results["rdma_bw"] = Suffix(results["rdma_bw"], unit="B/s")
+    results["rdma_vol"] = Suffix(results["rdma_vol"], unit="B")
+
+    if results["rdma_bw"]:
+        tmpl += "{ind}RDMA Bandwidth            {rdma_bw:>10.2f}\n"
+    if results["rdma_lat"]:
+        tmpl += "{ind}RDMA Latency              {rdma_lat[avg]:>10.2f} us"
+        if results["rdma_lat"]["max"]:
+            tmpl += "        (max: {rdma_lat[max]:.2f}, min: {rdma_lat[min]:.2f})\n"
+        else:
+            tmpl += "\n"
+
+    tmpl += "{ind}RDMA Data Volume:         {rdma_vol:>10.2f}\n"
+
+    if results["server_time"]:
+        tmpl += "{ind}Server CPU Time           {server_time[total]:>10.2f} s\n"
+        tmpl += "{ind}Server Duration           {server_time[duration]:>10.2f} s"
+        tmpl += "  ({server_time[cpu_percent_duration]:5.1f}%)\n"
+        tmpl += "{ind}Server Elapsed Time       {server_time[real]:>10.2f} s"
+        tmpl += "  ({server_time[cpu_percent_total]:5.1f}%)\n"
+
+    if results["client_time"]:
+        tmpl += "{ind}Client CPU Time           {client_time[total]:>10.2f} s\n"
+        tmpl += "{ind}Client Duration           {client_time[duration]:>10.2f} s"
+        tmpl += "  ({client_time[cpu_percent_duration]:5.1f}%)\n"
+        tmpl += "{ind}Client Elapsed Time       {client_time[real]:>10.2f} s"
+        tmpl += "  ({client_time[cpu_percent_total]:5.1f}%)\n"
+
+    if results["mbw_stats"]:
+        results["mbw_stats"]["avg"] = Suffix(results["mbw_stats"]["avg"], "B/s")
+        results["mbw_stats"]["max"] /= results["mbw_stats"]["avg"].div
+        results["mbw_stats"]["min"] /= results["mbw_stats"]["avg"].div
+        results["mbw_stats"]["volume"] = Suffix(results["mbw_stats"]["volume"], "B")
+
+        tmpl += ("{ind}MBW Background Bandwidth  {mbw_stats[avg]:>10.2f} "
+                 "    (max: {mbw_stats[max]:.2f}, min: {mbw_stats[min]:.2f})\n" +
+                 "{ind}MBW Data Volume           {mbw_stats[volume]:>10.1f}\n")
+
+    tmpl += ("{ind}LikWid Memory Data Volume {likwid_stats[Memory data volume]:>10.1f} "
+             "{likwid_units[Memory data volume]}\n")
+    tmpl += ("{ind}Total DDR Write BW        "
+             "{likwid_stats[Memory write bandwidth]:>10.1f} "
+             "{likwid_units[Memory write bandwidth]}\n")
+    tmpl += ("{ind}Total DDR Read BW         "
+             "{likwid_stats[Memory read bandwidth]:>10.1f} "
+             "{likwid_units[Memory read bandwidth]}\n")
+
+    print(tmpl.format(**results))
+
+def check_mmap_dev(mmap):
+    try:
+        with open(mmap, "r+b", buffering=0):
+            pass
+    except IOError as e:
+        if e.errno != errno.EACCES:
+            raise
+
+        print("Permission denied accessing {}".format(mmap))
+        print()
+
+        sudo_cmd = ["sudo", "chown", getpass.getuser(), mmap]
+        print("Run this sudo command? (assuming you trust us)")
+        print(" ".join(sudo_cmd))
+        res = raw_input("(Y/n) ")
+        if res.strip() and res[0].strip().lower() == 'n':
+            sys.exit(1)
+
+        sp.check_call(sudo_cmd)
+        print()
+
+        with open(mmap, "r+b", buffering=0):
+            pass
+
+if __name__ == "__main__":
+    import argparse
+
+    p = argparse.ArgumentParser()
+    p.add_argument("-c", "--client", default="flash-rdma",
+                   help="host to run the perftest client on (the server "
+                        "is run locally), default: %(default)s")
+    p.add_argument("-D", "--duration", type=int, default=5,
+                   help="duration, in seconds to run the perftest for, "
+                        "default: %(default)s")
+    p.add_argument("-s", "--size", type=parse_suffix, default=65535,
+                   help="RDMA message size in bytes (set <2 for all sizes), "
+                        "default: %(default)s")
+    p.add_argument("-L", "--log-file", type=argparse.FileType('w'),
+                   help="save command output to a log file")
+    p.add_argument("--mmap", metavar="DEV",
+                   help="device to use as an RDMA target, default: %(default)s")
+    p.add_argument("-p", "--perftest", default="ib_write_bw",
+                   help="which perftest binary to use, default: %(default)s")
+    p.add_argument("-S", "--socket", type=int, default=0,
+                   help="cpu socket to pin the processes to (should have the same "
+                        "locality as the device specified in --mmap), "
+                        "default: %(default)s")
+    p.add_argument("-v", "--verbose", action="count",
+                   help="print command output to stdout")
+    p.add_argument("test_args", nargs=argparse.REMAINDER,
+                   help="extra arguments are passed to the pertfest run")
+    options = p.parse_args()
+
+    if "--" in options.test_args:
+        options.test_args.remove("--")
+
+    try:
+
+        opts = options.__dict__
+        mmap = opts.pop('mmap')
+
+        if mmap:
+            check_mmap_dev(mmap)
+
+        if opts['size']<2:
+            sizes = (int(2**exp) for exp in range(1,24))
+        else:
+            sizes = [int(opts['size'])]
+
+        if opts['log_file']:
+            fname = opts['log_file'].name
+            fname, ext = os.path.splitext(fname)
+            fname = fname + "_client" + ext
+            try:
+                opts['client_log_file'] = open(fname, "w")
+            except IOError as e:
+                print(e)
+                sys.exit(1)
+
+        for size in sizes:
+
+            opts['size'] = size
+
+            print("Running system memory test\t({}, {:.0f})."
+                  .format(opts['perftest'], Suffix(opts['size'])))
+            mem_res = run_test(**opts)
+
+            if mmap:
+                print("Running mmap memory test\t({}, {:.0f})."
+                      .format(opts['perftest'], Suffix(opts['size'])))
+                mmap_res = run_test(mmap=mmap, **opts)
+
+            print()
+            print()
+            print("{} with system memory:".format(options.perftest))
+            print_results(mem_res, 2)
+
+            if mmap:
+                print("{} with {}:".format(options.perftest, mmap))
+                print_results(mmap_res, 2)
+
+    except KeyboardInterrupt:
+        print()
+        print()
+        pass
+    except (OSError, proc.ProcRunnerException) as e:
+        print()
+        print()
+        print(e)
