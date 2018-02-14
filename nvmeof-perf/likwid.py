@@ -15,7 +15,14 @@
 ##
 ########################################################################
 
+import proc
+
+import csv
 import re
+import subprocess as sp
+
+from queue import Queue
+from io import StringIO
 
 class LikwidPerfMixin(object):
     likwid_re = re.compile(r"^\|\s+(?P<name>[^\[\|]+)" +
@@ -35,3 +42,74 @@ class LikwidPerfMixin(object):
         if not m: return
         self.likwid_stats[m.group("name")] = float(m.group("value"))
         self.likwid_units[m.group("name")] = m.group("units")
+
+class LikwidException(Exception):
+    pass
+
+class LikwidTimeline(proc.ProcRunner):
+    exe = ["likwid-perfctr"]
+    col_re = re.compile(r"^(?P<name>[^\[\|]+)(\[(?P<units>.*?)\])?")
+
+    def __init__(self, group="MEM", cpu="S0:1", time=1.0, **kwargs):
+        super().__init__(self, **kwargs)
+
+        self.args = ["-f", "-g", group, "-c", cpu, "-O"]
+        data = sp.check_output(self.exe + self.args + ["-S", "10ms"])
+        self.args += ["-t", "{}s".format(time)]
+
+        cdata = csv.reader(StringIO(data.decode()), delimiter=",")
+
+        for row in cdata:
+            if row[0] == "TABLE" and row[1] == "Group 1 Metric":
+                break
+
+        self.cpus = [c for c in next(cdata)[1:] if c]
+
+        self.cols = []
+        self.units = []
+
+        for row in cdata:
+            if row[0] == "TABLE":
+                break
+
+            m = self.col_re.match(row[0])
+
+            self.cols.append(m.group("name").strip())
+            self.units.append(m.group("units"))
+
+        self.cols = tuple(self.cols)
+        self.units = tuple(self.units)
+
+        self.queue = Queue()
+
+    def process_line(self, line):
+        if not line.startswith("1 "):
+            return
+
+        cols = line.split()
+
+        group_id = int(cols.pop(0))
+        events = int(cols.pop(0))
+        nthreads = int(cols.pop(0))
+        timestamp = float(cols.pop(0))
+
+        if events != len(self.cols):
+            raise LikwidException("Unexpected number of events: {} != {}",
+                                  events, len(self.cols))
+
+        cpu_cols = [0.] * events
+        for i in range(len(cols) // events):
+            ncols = cols[i::(len(cols) // events)]
+            cpu_cols = [s + float(n) for  s, n in zip(cpu_cols, ncols)]
+
+        self.queue.put(dict(zip(self.cols, cpu_cols)))
+
+    def next(self):
+        return self.queue.get()
+
+if __name__ == "__main__":
+    l = LikwidTimeline(cpu="S0:1@S1:1")
+    l.start()
+
+    for q in iter(l.next, None):
+        print(q)
