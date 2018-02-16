@@ -16,6 +16,7 @@
 ########################################################################
 
 import proc
+from suffix import Suffix
 
 import csv
 import re
@@ -23,6 +24,7 @@ import subprocess as sp
 
 from queue import Queue
 from io import StringIO
+from collections import OrderedDict
 
 class LikwidPerfMixin(object):
     likwid_re = re.compile(r"^\|\s+(?P<name>[^\[\|]+)" +
@@ -50,12 +52,12 @@ class LikwidTimeline(proc.ProcRunner):
     exe = ["likwid-perfctr"]
     col_re = re.compile(r"^(?P<name>[^\[\|]+)(\[(?P<units>.*?)\])?")
 
-    def __init__(self, group="MEM", cpu="S0:1", time=1.0, **kwargs):
+    def __init__(self, group="MEM", cpu="S0:1", period=1.0, **kwargs):
         super().__init__(self, **kwargs)
 
         self.args = ["-f", "-g", group, "-c", cpu, "-O"]
         data = sp.check_output(self.exe + self.args + ["-S", "10ms"])
-        self.args += ["-t", "{}s".format(time)]
+        self.args += ["-t", "{}s".format(period)]
 
         cdata = csv.reader(StringIO(data.decode()), delimiter=",")
 
@@ -78,7 +80,24 @@ class LikwidTimeline(proc.ProcRunner):
             self.units.append(m.group("units"))
 
         self.cols = tuple(self.cols)
-        self.units = tuple(self.units)
+        self.units = self.units
+        self.multiplier = [1] * len(self.units)
+
+        for i in range(len(self.units)):
+            if not self.units[i]:
+                continue
+            elif self.units[i].startswith("KByte"):
+                self.multiplier[i] = 1 << 10
+                self.units[i] = "B"
+            elif self.units[i].startswith("MByte"):
+                self.multiplier[i] = 1 << 20
+                self.units[i] = "B"
+            elif self.units[i].startswith("GByte"):
+                self.multiplier[i] = 1 << 30
+                self.units[i] = "B"
+            elif self.units[i].startswith("TByte"):
+                self.multiplier[i] = 1 << 40
+                self.units[i] = "B"
 
         self.queue = Queue()
 
@@ -100,16 +119,39 @@ class LikwidTimeline(proc.ProcRunner):
         cpu_cols = [0.] * events
         for i in range(len(cols) // events):
             ncols = cols[i::(len(cols) // events)]
+            ncols = [float(x) * m for x, m in zip(ncols, self.multiplier)]
             cpu_cols = [s + float(n) for  s, n in zip(cpu_cols, ncols)]
 
-        self.queue.put(dict(zip(self.cols, cpu_cols)))
+        self.queue.put(OrderedDict(zip(self.cols, cpu_cols)))
 
     def next(self):
         return self.queue.get()
 
-if __name__ == "__main__":
-    l = LikwidTimeline(cpu="S0:1@S1:1")
-    l.start()
+    def print_next(self, indent=""):
+        stats = self.next()
 
-    for q in iter(l.next, None):
-        print(q)
+        print("{}Memory Bandwidth Stats:".format(indent))
+        indent += "  "
+
+        read = Suffix(stats["Memory read data volume"])
+        write = Suffix(stats["Memory write data volume"])
+        read_bw = Suffix(stats["Memory read bandwidth"], unit="B/s")
+        write_bw = Suffix(stats["Memory write bandwidth"], unit="B/s")
+
+        print("{}{:<39} {:>7.1f}  \t{:>7.1f}".
+              format(indent, "Read:", read, read_bw))
+        print("{}{:<39} {:>7.1f}  \t{:>7.1f}".
+              format(indent, "Write:", write, write_bw))
+
+
+if __name__ == "__main__":
+    import time
+
+    tl = LikwidTimeline(cpu="S0:1@S1:1", period=2.0)
+    tl.start()
+
+    while True:
+        print(time.asctime())
+        tl.print_next();
+        print()
+        print()
