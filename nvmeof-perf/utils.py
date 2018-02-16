@@ -15,9 +15,26 @@
 ##
 ########################################################################
 
+import time
+
 class DummyContext(object):
     def __enter__(self):
         return self
 
     def __exit__(self, type, value, traceback):
         pass
+
+class Timeline(object):
+    def __init__(self, period=1.0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.period = period
+        self.last_time = time.time() - period
+
+    def wait_until(self, tm):
+        if tm > time.time():
+            time.sleep(tm - time.time())
+
+    def next(self):
+        self.wait_until(self.last_time + self.period)
+        self.last_time = time.time()

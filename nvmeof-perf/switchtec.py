@@ -14,8 +14,13 @@
 ##
 ########################################################################
 
+from suffix import Suffix
+
+import utils
 import copy
 import ctypes as c
+
+from collections import OrderedDict
 
 class SwitchtecPortId(c.Structure):
     _fields_ = [("partition", c.c_ubyte),
@@ -109,7 +114,9 @@ class SwitchtecError(Exception):
         super().__init__("{}: {}".format(msg, err_msg))
 
 class Switchtec(object):
-    def __init__(self, devpath="/dev/switchtec0"):
+    def __init__(self, devpath="/dev/switchtec0", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
         self.dev = swlib.switchtec_open(devpath.encode())
         if not self.dev:
             raise SwitchtecError(devpath)
@@ -145,7 +152,7 @@ class Switchtec(object):
         return [SwitchtecBwCntrRes.from_buffer_copy(bwdata[i])
                 for i in range(len(port_ids))]
 
-class SwitchtecTimeline(Switchtec):
+class SwitchtecTimeline(Switchtec, utils.Timeline):
     ignore_classes = [b"ucm", b"issm", b"umad", b"uverbs", b"ptp"]
 
     def __init__(self, *args, **kwargs):
@@ -175,20 +182,56 @@ class SwitchtecTimeline(Switchtec):
         return "Port {}".format(st.port.log_id)
 
     def next(self):
-        bwdata = self.bwcntr_many(self.port_ids)
+        super().next()
+
+        bwdata_new = self.bwcntr_many(self.port_ids)
 
         if self.last:
-            bwdata = [bw - l for bw, l in zip(bwdata, self.last)]
+            bwdata = [bw - l for bw, l in zip(bwdata_new, self.last)]
+        else:
+            bwdata = bwdata_new
 
-        byte_counts = {}
+        self.last = bwdata_new
+
+        byte_counts = OrderedDict()
         for n, bw in zip(self.names, bwdata):
             byte_counts[n] = (bw.ingress.total(), bw.egress.total())
 
-        rates = {}
+        rates = OrderedDict()
         for n, bw in zip(self.names, bwdata):
             rates[n] = (bw.ingress.total() / bw.time(),
                         bw.egress.total() / bw.time())
 
-        self.last = bwdata
 
         return byte_counts, rates
+
+    def print_next(self, indent=""):
+        bytes, rates = self.next()
+
+        print("{}Switchtec PCI Stats:".format(indent))
+        indent += "  "
+
+        for (n, (ing, eg)), (_, (ing_rate, eg_rate)) in zip(bytes.items(),
+                                                            rates.items()):
+            ing = Suffix(ing)
+            eg = Suffix(eg)
+            ing_rate = Suffix(ing_rate, "B/s")
+            eg_rate = Suffix(eg_rate, "B/s")
+
+            n += ":"
+
+            print("{}{:<30} in:    {:>7.1f}  \t{:>7.1f}".
+                  format(indent, n, ing, ing_rate))
+            print("{}{:<30} out:   {:>7.1f}  \t{:>7.1f}".
+                  format(indent, "",  eg, eg_rate))
+
+if __name__ == "__main__":
+    import time
+
+    sw = SwitchtecTimeline(period=2.0)
+
+    while True:
+        print(time.asctime())
+        sw.print_next();
+        print()
+        print()
