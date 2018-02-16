@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+########################################################################
+##
+## Copyright 2018 Eidetic Communications Inc.
+##
+## Licensed under the Apache License, Version 2.0 (the "License"); you
+## may not use this file except in compliance with the License. You may
+## obtain a copy of the License at
+## http://www.apache.org/licenses/LICENSE-2.0 Unless required by
+## applicable law or agreed to in writing, software distributed under the
+## License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+## CONDITIONS OF ANY KIND, either express or implied. See the License for
+## the specific language governing permissions and limitations under the
+## License.
+##
+########################################################################
+
+import cpustats
+import iostats
+import likwid
+import rnic
+import switchtec
+
+import time
+import contextlib
+
+if __name__ == "__main__":
+    import argparse
+
+    p = argparse.ArgumentParser()
+    p.add_argument("-d", "--disk", default=[], action="append",
+                   help="disk device stats to print")
+    p.add_argument("-m", "--memory", action="store_true",
+                   help="print memory bandwith stats using likwid-perfctr")
+    p.add_argument("-r", "--rnic", default=[], action="append",
+                   help="RNIC device stats to print")
+    p.add_argument("-s", "--switchtec", default=[], action="append",
+                   help="Switchtec devices to print")
+    p.add_argument("-t", "--time", default=2.0,
+                   help="time between printing samples")
+    args = p.parse_args()
+
+    try:
+        timelines = []
+
+        def add_timeline(timeline, **kwargs):
+            timelines.append(timeline(period=args.time, **kwargs))
+
+        add_timeline(cpustats.CpuTimeline)
+
+        if args.memory:
+            add_timeline(likwid.LikwidTimeline)
+
+        if args.disk:
+            add_timeline(iostats.IoStatsTimeline, devices=args.disk)
+
+        if args.rnic:
+            add_timeline(rnic.RnicTimeline, devices=args.rnic)
+
+        for s in args.switchtec:
+            add_timeline(switchtec.SwitchtecTimeline, devpath=s)
+
+        with contextlib.ExitStack() as stack:
+            for tl in timelines:
+                stack.enter_context(tl)
+
+            while True:
+                for tl in timelines:
+                    tl.print_next()
+                    print()
+
+                print()
+                print(time.asctime())
+                print()
+                print()
+
+    except KeyboardInterrupt:
+        print()
+        print()
+    except Exception as e:
+        print(e)
