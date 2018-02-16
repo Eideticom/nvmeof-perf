@@ -143,10 +143,22 @@ class LikwidTimeline(proc.ProcRunner):
             print("{}{:<30} write: {:>7.1f}  \t{:>7.1f}".
                   format(indent, "", write, write_bw))
 
+def likwid_all_sockets():
+    data = sp.check_output(["likwid-pin", "-p"]).decode()
+    domain_re = re.compile(r"^Domain (S[0-9]+):$")
+
+    sockets = []
+    for l in data.split("\n"):
+        m = domain_re.match(l)
+        if m:
+            sockets.append(m.group(1))
+
+    return "@".join("{}:1".format(s) for s in sockets)
+
 if __name__ == "__main__":
     import time
 
-    tl = LikwidTimeline(cpu="S0:1@S1:1", period=2.0)
+    tl = LikwidTimeline(cpu=likwid_all_sockets(), period=2.0)
     tl.start()
 
     while True:
