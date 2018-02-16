@@ -24,7 +24,7 @@ class DummyContext(object):
     def __exit__(self, type, value, traceback):
         pass
 
-class Timeline(object):
+class Timeline(DummyContext):
     def __init__(self, period=1.0, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

@@ -21,6 +21,7 @@ from suffix import Suffix
 import csv
 import re
 import subprocess as sp
+import time
 
 from queue import Queue
 from io import StringIO
@@ -51,9 +52,13 @@ class LikwidException(Exception):
 class LikwidTimeline(proc.ProcRunner):
     exe = ["likwid-perfctr"]
     col_re = re.compile(r"^(?P<name>[^\[\|]+)(\[(?P<units>.*?)\])?")
+    kill_me = True
 
-    def __init__(self, group="MEM", cpu="S0:1", period=1.0, **kwargs):
+    def __init__(self, group="MEM", cpu=None, period=1.0, **kwargs):
         super().__init__(self, **kwargs)
+
+        if cpu == None:
+            cpu = likwid_all_sockets()
 
         self.args = ["-f", "-g", group, "-c", cpu, "-O"]
         data = sp.check_output(self.exe + self.args + ["-S", "10ms"])
@@ -99,6 +104,13 @@ class LikwidTimeline(proc.ProcRunner):
                 self.units[i] = "B"
 
         self.queue = Queue()
+
+    def __enter__(self):
+        ret = super().__enter__()
+        while self.queue.empty():
+            time.sleep(0.1)
+
+        return ret
 
     def process_line(self, line):
         if not line.startswith("1 "):
@@ -156,13 +168,11 @@ def likwid_all_sockets():
     return "@".join("{}:1".format(s) for s in sockets)
 
 if __name__ == "__main__":
-    import time
-
     tl = LikwidTimeline(cpu=likwid_all_sockets(), period=2.0)
-    tl.start()
 
-    while True:
-        print(time.asctime())
-        tl.print_next();
-        print()
-        print()
+    with tl:
+        while True:
+            print(time.asctime())
+            tl.print_next();
+            print()
+            print()
