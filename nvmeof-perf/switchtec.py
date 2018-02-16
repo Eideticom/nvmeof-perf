@@ -118,6 +118,9 @@ class Switchtec(object):
     def __init__(self, devpath="/dev/switchtec0", *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        if swlib is None:
+            raise OSError("Unable to load libswitchtec.so")
+
         self.devpath = devpath
 
         self.dev = swlib.switchtec_open(devpath.encode())
