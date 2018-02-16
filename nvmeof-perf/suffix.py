@@ -18,13 +18,22 @@
 import re
 
 suffix_re = re.compile(r"^([0-9\.]+)([KMGTP]?)", re.IGNORECASE)
-suffix_values = [('' , 1),
+
+suffix_bin_values = [('' , 1),
                  ('K', 1 << 10),
                  ('M', 1 << 20),
                  ('G', 1 << 30),
                  ('T', 1 << 40),
                  ('P', 1 << 50)]
-suffix_dict = dict(suffix_values)
+suffix_bin_dict = dict(suffix_bin_values)
+
+suffix_dec_values = [('' , 1),
+                 ('K', 1e3),
+                 ('M', 1e6),
+                 ('G', 1e9),
+                 ('T', 1e12),
+                 ('P', 1e15)]
+suffix_dec_dict = dict(suffix_dec_values)
 
 def parse_suffix(value):
     m = suffix_re.match(value)
@@ -32,17 +41,19 @@ def parse_suffix(value):
         raise ValueError("Could not parse: '{}'".format(value))
 
     value = float(m.group(1))
-    value *= suffix_dict[m.group(2).upper()]
+    value *= suffix_bin_dict[m.group(2).upper()]
     return value
 
 class Suffix(object):
-    def __init__(self, value, unit="B"):
+    def __init__(self, value, unit="B", decimal=False):
         self.unit = unit
+
+        suffix_values = suffix_dec_values if decimal else suffix_bin_values
 
         for s, v in suffix_values[::-1]:
             if value < v:
                 continue
-            if s:
+            if s and not decimal:
                 s+= "i"
 
             self.div = v

@@ -14,17 +14,32 @@
 ##
 ########################################################################
 
+import utils
+from suffix import Suffix
+
 import os
 import stat
 import sys
 
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
-IoStats = namedtuple("IoStats", ["reads", "reads_merged",  "read_sectors",
-                                 "read_ms", "writes", "writes_merged",
-                                 "write_sectors", "write_ms",
-                                 "ios_in_progress", "io_ms",
-                                 "ios_weighted_ms"])
+class IoStats(namedtuple("IoStats", ["reads", "reads_merged",  "read_sectors",
+                                     "read_ms", "writes", "writes_merged",
+                                     "write_sectors", "write_ms",
+                                     "ios_in_progress", "io_ms",
+                                     "ios_weighted_ms"])):
+    def __sub__(a, b):
+        return IoStats(reads = a.reads - b.reads,
+                       reads_merged = a.reads_merged - b.reads_merged,
+                       read_sectors = a.read_sectors - b.read_sectors,
+                       read_ms = a.read_ms - b.read_ms,
+                       writes = a.writes - b.writes,
+                       writes_merged = a.writes_merged - b.writes_merged,
+                       write_sectors = a.write_sectors - b.write_sectors,
+                       write_ms = a.write_ms - b.write_ms,
+                       ios_in_progress = a.ios_in_progress - b.ios_in_progress,
+                       io_ms = a.io_ms - b.io_ms,
+                       ios_weighted_ms = a.ios_weighted_ms - b.ios_weighted_ms)
 
 def iostats_get_path(device):
     if os.path.exists(device):
@@ -50,13 +65,75 @@ def iostats_device_stats(device):
     return IoStats._make(int(x) for x in data)
 
 def iostats_stats(devices):
-    ret = {}
+    ret = OrderedDict()
     for d in devices:
         ret[d] = iostats_device_stats(d)
     return ret
 
-if __name__ == "__main__":
-    stats = iostats_stats(sys.argv[1:])
+class IoStatsTimeline(utils.Timeline):
+    def __init__(self, devices=[], *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    for s, t in stats.items():
-        print("{:<20}".format(s), t)
+        self.devices = devices
+        self.last = None
+
+    def next(self):
+        super().next()
+
+        stats_new = iostats_stats(self.devices)
+
+        if self.last:
+            stats = {d: a - self.last[d] for d, a in stats_new.items()}
+        else:
+            stats = stats_new
+
+        self.last = stats_new
+
+        ret = OrderedDict()
+        for d, s in stats.items():
+            read = s.read_sectors * 512
+            write = s.write_sectors * 512
+            ios = s.reads + s.writes
+
+            read_rate = read / (s.read_ms * 1e-3) if s.read_ms else 0
+            write_rate = write / (s.write_ms * 1e-3) if s.write_ms else 0
+            io_rate = (ios / (s.io_ms * 1e-3) if s.io_ms else 0)
+
+            ret[d] = (read, read_rate, write, write_rate, ios, io_rate)
+
+        return ret
+
+    def print_next(self, indent=""):
+        stats = self.next()
+
+        print("{}IO Stats:".format(indent))
+        indent += "  "
+
+        for d, (rd, rd_rate, wr, wr_rate, io, io_rate) in stats.items():
+            d = os.path.basename(d)
+
+            rd = Suffix(rd)
+            wr = Suffix(wr)
+            io = Suffix(io, unit="IOPS", decimal=True)
+
+            rd_rate = Suffix(rd_rate, unit="B/s")
+            wr_rate = Suffix(wr_rate, unit="B/s")
+            io_rate = Suffix(io_rate, unit="IOPS/s", decimal=True)
+
+            print("{}{:<30} read:  {:>7.1f}  \t{:>7.1f}".
+                  format(indent, d, rd, rd_rate))
+            print("{}{:<30} wrote: {:>7.1f}  \t{:>7.1f}".
+                  format(indent, "", wr, wr_rate))
+            print("{}{:<30} ios:   {:>7.1f}  \t{:>7.1f}".
+                  format(indent, "", io, io_rate))
+
+if __name__ == "__main__":
+    import time
+
+    tl = IoStatsTimeline(period=2.0, devices=["/dev/nvme0n1"])
+
+    while True:
+        print(time.asctime())
+        tl.print_next();
+        print()
+        print()
