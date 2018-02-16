@@ -23,6 +23,21 @@ import switchtec
 
 import time
 import contextlib
+import platform
+
+for l in open("/proc/cpuinfo"):
+    field, value = l.split(":")
+    if field.strip() == "model name":
+        cpu_model = value.strip()
+        break
+
+def print_hostinfo():
+    uname = platform.uname()
+
+    print("Host:    {.node}".format(uname))
+    print("Kernel:  {}".format(platform.platform()))
+    print("Machine: {.machine}".format(uname))
+    print("CPU:     {}".format(cpu_model))
 
 if __name__ == "__main__":
     import argparse
@@ -65,6 +80,10 @@ if __name__ == "__main__":
                 stack.enter_context(tl)
 
             while True:
+                print_hostinfo()
+                print()
+                print()
+
                 for tl in timelines:
                     tl.print_next()
                     print()
