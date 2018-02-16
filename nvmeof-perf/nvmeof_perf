@@ -20,6 +20,7 @@ import iostats
 import likwid
 import rnic
 import switchtec
+import utils
 
 import time
 import contextlib
@@ -79,19 +80,22 @@ if __name__ == "__main__":
             for tl in timelines:
                 stack.enter_context(tl)
 
-            while True:
-                print_hostinfo()
-                print()
-                print()
+            with utils.CursesContext() as scr:
+                scr.clear()
 
-                for tl in timelines:
-                    tl.print_next()
+                while True:
+                    timelines[0].wait_until_ready()
+
+                    print(time.asctime())
+                    print_hostinfo()
+                    print()
                     print()
 
-                print()
-                print(time.asctime())
-                print()
-                print()
+                    for tl in timelines:
+                        print()
+                        tl.print_next()
+
+                    scr.clear()
 
     except KeyboardInterrupt:
         print()

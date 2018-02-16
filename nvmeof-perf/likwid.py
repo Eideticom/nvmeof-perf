@@ -105,11 +105,13 @@ class LikwidTimeline(proc.ProcRunner):
 
         self.queue = Queue()
 
-    def __enter__(self):
-        ret = super().__enter__()
+    def wait_until_ready(self):
         while self.queue.empty():
             time.sleep(0.1)
 
+    def __enter__(self):
+        ret = super().__enter__()
+        self.wait_until_ready()
         return ret
 
     def process_line(self, line):

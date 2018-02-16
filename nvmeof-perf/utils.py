@@ -15,7 +15,9 @@
 ##
 ########################################################################
 
+import sys
 import time
+import curses
 
 class DummyContext(object):
     def __enter__(self):
@@ -31,10 +33,28 @@ class Timeline(DummyContext):
         self.period = period
         self.last_time = time.time() - period
 
-    def wait_until(self, tm):
+    def wait_until_ready(self):
+        tm = self.last_time + self.period
         if tm > time.time():
             time.sleep(tm - time.time())
 
     def next(self):
-        self.wait_until(self.last_time + self.period)
+        self.wait_until_ready()
         self.last_time = time.time()
+
+class CursesContext(object):
+    def __enter__(self):
+        curses.setupterm()
+        self.cmd("smcup")
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.cmd("rmcup")
+
+    def cmd(self, name, *args):
+        s = curses.tigetstr(name)
+        sys.stdout.buffer.write(curses.tparm(s, *args))
+
+    def clear(self):
+        self.cmd("clear")
+        self.cmd("cup", 0, 0)
