@@ -14,9 +14,10 @@
 ##
 ########################################################################
 
+import utils
 from suffix import Suffix
 
-import utils
+import os
 import copy
 import ctypes as c
 
@@ -117,6 +118,8 @@ class Switchtec(object):
     def __init__(self, devpath="/dev/switchtec0", *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.devpath = devpath
+
         self.dev = swlib.switchtec_open(devpath.encode())
         if not self.dev:
             raise SwitchtecError(devpath)
@@ -208,7 +211,8 @@ class SwitchtecTimeline(Switchtec, utils.Timeline):
     def print_next(self, indent=""):
         bytes, rates = self.next()
 
-        print("{}Switchtec PCI Stats:".format(indent))
+        print("{}Switchtec PCI Stats for {}:".
+              format(indent, os.path.basename(self.devpath)))
         indent += "  "
 
         for (n, (ing, eg)), (_, (ing_rate, eg_rate)) in zip(bytes.items(),
