@@ -66,7 +66,6 @@ class LikwidTimeline(proc.ProcRunner):
                 break
 
         self.cpus = [c for c in next(cdata)[1:] if c]
-
         self.cols = []
         self.units = []
 
@@ -116,13 +115,13 @@ class LikwidTimeline(proc.ProcRunner):
             raise LikwidException("Unexpected number of events: {} != {}",
                                   events, len(self.cols))
 
-        cpu_cols = [0.] * events
+        cpus = []
         for i in range(len(cols) // events):
             ncols = cols[i::(len(cols) // events)]
             ncols = [float(x) * m for x, m in zip(ncols, self.multiplier)]
-            cpu_cols = [s + float(n) for  s, n in zip(cpu_cols, ncols)]
+            cpus.append(OrderedDict(zip(self.cols, ncols)))
 
-        self.queue.put(OrderedDict(zip(self.cols, cpu_cols)))
+        self.queue.put(cpus)
 
     def next(self):
         return self.queue.get()
@@ -133,16 +132,16 @@ class LikwidTimeline(proc.ProcRunner):
         print("{}Memory Bandwidth Stats:".format(indent))
         indent += "  "
 
-        read = Suffix(stats["Memory read data volume"])
-        write = Suffix(stats["Memory write data volume"])
-        read_bw = Suffix(stats["Memory read bandwidth"], unit="B/s")
-        write_bw = Suffix(stats["Memory write bandwidth"], unit="B/s")
+        for cname, c in zip(self.cpus, stats):
+            read = Suffix(c["Memory read data volume"])
+            write = Suffix(c["Memory write data volume"])
+            read_bw = Suffix(c["Memory read bandwidth"], unit="B/s")
+            write_bw = Suffix(c["Memory write bandwidth"], unit="B/s")
 
-        print("{}{:<39} {:>7.1f}  \t{:>7.1f}".
-              format(indent, "Read:", read, read_bw))
-        print("{}{:<39} {:>7.1f}  \t{:>7.1f}".
-              format(indent, "Write:", write, write_bw))
-
+            print("{}{:<30} read:  {:>7.1f}  \t{:>7.1f}".
+                  format(indent, cname, read, read_bw))
+            print("{}{:<30} write: {:>7.1f}  \t{:>7.1f}".
+                  format(indent, "", write, write_bw))
 
 if __name__ == "__main__":
     import time
