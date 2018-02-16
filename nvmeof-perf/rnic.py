@@ -15,8 +15,12 @@
 ##
 ########################################################################
 
+import utils
+from suffix import Suffix
+
 import os
 import sys
+import time
 from collections import OrderedDict
 
 class RNICException(Exception):
@@ -25,8 +29,33 @@ class RNICException(Exception):
 def _readfile(fname):
     return open(fname).read(4096)
 
+class RnicStats(object):
+    def __init__(self):
+        self.ports = {}
+
+    def add_port(self, pid, tx, rx):
+        self.ports[pid] = tx, rx
+
+    def __sub__(a, b):
+        ret = RnicStats()
+
+        for port, (tx, rx) in a.ports.items():
+            btx, brx = b.ports[port]
+            ret.add_port(port, tx - btx, rx - brx)
+
+        return ret
+
+    def total(self):
+        tx_tot = rx_tot = 0
+        for p, (tx, rx) in self.ports.items():
+            tx_tot += tx
+            rx_tot += rx
+
+        return tx_tot, rx_tot
+
 def rnic_port_dir_stats(device, ports_dir):
-    ports = {}
+    ret = RnicStats()
+
     for p in sorted(os.listdir(ports_dir)):
         tx = os.path.join(ports_dir, p, "hw_counters", "tx_bytes")
         rx = os.path.join(ports_dir, p, "hw_counters", "tx_bytes")
@@ -39,9 +68,9 @@ def rnic_port_dir_stats(device, ports_dir):
             raise RNICException("Stats files not found for device '{}'".
                                 format(device))
 
-        ports[p] = (int(_readfile(tx)), int(_readfile(rx)))
+        ret.add_port(p, int(_readfile(tx)), int(_readfile(rx)))
 
-    return ports
+    return ret
 
 def rnic_device_stats(device):
     ports_dir = os.path.join("/sys", "class", "infiniband", device, "ports")
@@ -62,13 +91,64 @@ def rnic_stats(devices):
         ret[d] = rnic_device_stats(d)
     return ret
 
-if __name__ == "__main__":
+class RnicTimeline(utils.Timeline):
+    def __init__(self, devices=[], *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-    try:
-        stats = rnic_stats(sys.argv[1:])
-        for dev, ports in stats.items():
-            print("{:<20}".format(dev))
-            for p, (tx, rx) in ports.items():
-                print("   port {:<5} tx: {:>10} rx: {:>10}".format(p, tx, rx))
-    except RNICException as e:
-        print(e)
+        self.devices = devices
+        self.last = None
+        self.last_read = None
+
+    def next(self):
+        super().next()
+
+        stats_new = rnic_stats(self.devices)
+
+        if self.last:
+            stats = {d: a - self.last[d] for d, a in stats_new.items()}
+            duration = time.time() - self.last_read
+        else:
+            stats = stats_new
+            duration = None
+
+        self.last = stats_new
+        self.last_read = time.time()
+
+        ret = OrderedDict()
+        for d, s in stats.items():
+            tx, rx = s.total()
+
+            tx_rate = tx / duration if duration else 0
+            rx_rate = rx / duration if duration else 0
+
+            ret[d] = tx, rx, tx_rate, rx_rate
+
+        return ret
+
+    def print_next(self, indent=""):
+        stats = self.next()
+
+        print("{}RNIC Stats:".format(indent))
+        indent += "  "
+
+        for d, (tx, rx, tx_rate, rx_rate) in stats.items():
+            tx = Suffix(tx)
+            rx = Suffix(rx)
+            tx_rate = Suffix(tx_rate, unit="B/s")
+            rx_rate = Suffix(rx_rate, unit="B/s")
+
+            print("{}{:<30} tx:    {:>7.1f}  \t{:>7.1f}".
+                  format(indent, d, tx, tx_rate))
+            print("{}{:<30} rx:    {:>7.1f}  \t{:>7.1f}".
+                  format(indent, "", rx, rx_rate))
+
+if __name__ == "__main__":
+    import time
+
+    tl = RnicTimeline(period=2.0, devices=["mlx5_0"])
+
+    while True:
+        print(time.asctime())
+        tl.print_next();
+        print()
+        print()
