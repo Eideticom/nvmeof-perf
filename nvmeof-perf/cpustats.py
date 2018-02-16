@@ -22,7 +22,7 @@ import os
 from collections import namedtuple
 
 class CpuStats(namedtuple("CpuStats", ["user", "system", "idle",
-                                       "iowait", "total", "intr",
+                                       "iowait", "total", "intr", "ctxt",
                                        "mem_total", "mem_avail",
                                        "mem_used"])):
     def __sub__(a, b):
@@ -32,6 +32,7 @@ class CpuStats(namedtuple("CpuStats", ["user", "system", "idle",
                         iowait=a.iowait - b.iowait,
                         total=a.total - b.total,
                         intr=a.intr - b.intr,
+                        ctxt=a.ctxt - b.ctxt,
                         mem_total=a.mem_total,
                         mem_avail=a.mem_avail,
                         mem_used=a.mem_used)
@@ -56,6 +57,8 @@ def cpu_stats():
 
         elif data[0] == "intr":
             ret["intr"] = int(data[1])
+        elif data[0] == "ctxt":
+            ret["ctxt"] = int(data[1])
 
     for l in open("/proc/meminfo").readlines():
         name, value = l.split(":")
@@ -118,6 +121,8 @@ class CpuTimeline(utils.Timeline):
                      stats.mem_used / stats.mem_total))
         print("{}{:<37} {:>9d}".
               format(indent, "Interrupts:", stats.intr))
+        print("{}{:<37} {:>9d}".
+              format(indent, "Ctx Switches:", stats.ctxt))
 
 if __name__ == "__main__":
     import time
