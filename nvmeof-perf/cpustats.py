@@ -102,7 +102,7 @@ class CpuTimeline(utils.Timeline):
         indent += "  "
 
         def print_line(typ):
-            print("{}{:<39} {:>7.1f}  \t{:>7.1%}".
+            print("{}{:<37} {:>9.1f}  \t{:>7.1%}".
                   format(indent, typ.title() + ":", getattr(stats, typ),
                          getattr(stats, typ) / stats.total))
 
@@ -113,9 +113,11 @@ class CpuTimeline(utils.Timeline):
 
         mem_used = Suffix(stats.mem_used)
 
-        print("{}{:<39} {:>7.1f}  \t{:>7.1%}".
+        print("{}{:<37} {:>9.1f}  \t{:>7.1%}".
               format(indent, "Memory Used:", mem_used,
                      stats.mem_used / stats.mem_total))
+        print("{}{:<37} {:>9d}".
+              format(indent, "Interrupts:", stats.intr))
 
 if __name__ == "__main__":
     import time
