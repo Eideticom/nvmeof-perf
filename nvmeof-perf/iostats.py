@@ -14,6 +14,7 @@
 ##
 ########################################################################
 
+import colours
 import utils
 from suffix import Suffix
 
@@ -106,7 +107,7 @@ class IoStatsTimeline(utils.Timeline):
     def print_next(self, indent=""):
         stats = self.next()
 
-        print("{}IO Stats:".format(indent))
+        print("{}{c.bold}IO Stats:{c.rst}".format(indent, c=colours))
         indent += "  "
 
         for d, (rd, rd_rate, wr, wr_rate, io, io_rate) in stats.items():

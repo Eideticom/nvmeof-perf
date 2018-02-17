@@ -14,6 +14,7 @@
 ##
 ########################################################################
 
+import colours
 import utils
 from suffix import Suffix
 
@@ -101,7 +102,7 @@ class CpuTimeline(utils.Timeline):
     def print_next(self, indent=""):
         stats = self.next()
 
-        print("{}CPU Stats:".format(indent))
+        print("{}{c.bold}CPU Stats:{c.rst}".format(indent, c=colours))
         indent += "  "
 
         def print_line(typ):

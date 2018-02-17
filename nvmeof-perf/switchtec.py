@@ -14,6 +14,7 @@
 ##
 ########################################################################
 
+import colours
 import utils
 from suffix import Suffix
 
@@ -214,8 +215,8 @@ class SwitchtecTimeline(Switchtec, utils.Timeline):
     def print_next(self, indent=""):
         bytes, rates = self.next()
 
-        print("{}Switchtec PCI Stats for {}:".
-              format(indent, os.path.basename(self.devpath)))
+        print("{}{c.bold}Switchtec PCI Stats for {}{c.rst}:".
+              format(indent, os.path.basename(self.devpath), c=colours))
         indent += "  "
 
         for (n, (ing, eg)), (_, (ing_rate, eg_rate)) in zip(bytes.items(),

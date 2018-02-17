@@ -15,6 +15,7 @@
 ##
 ########################################################################
 
+import colours
 import utils
 from suffix import Suffix
 
@@ -128,7 +129,7 @@ class RnicTimeline(utils.Timeline):
     def print_next(self, indent=""):
         stats = self.next()
 
-        print("{}RNIC Stats:".format(indent))
+        print("{}{c.bold}RNIC Stats:{c.rst}".format(indent, c=colours))
         indent += "  "
 
         for d, (tx, rx, tx_rate, rx_rate) in stats.items():

@@ -15,6 +15,7 @@
 ##
 ########################################################################
 
+import colours
 import proc
 from suffix import Suffix
 
@@ -143,7 +144,8 @@ class LikwidTimeline(proc.ProcRunner):
     def print_next(self, indent=""):
         stats = self.next()
 
-        print("{}Memory Bandwidth Stats:".format(indent))
+        print("{}{c.bold}Memory Bandwidth Stats:{c.rst}".
+              format(indent, c=colours))
         indent += "  "
 
         for cname, c in zip(self.cpus, stats):
