@@ -22,6 +22,7 @@ import rnic
 import switchtec
 import utils
 
+import sys
 import time
 import contextlib
 import platform
@@ -40,6 +41,15 @@ def print_hostinfo():
     print("Machine: {.machine}".format(uname))
     print("CPU:     {}".format(cpu_model))
 
+class Logger(object):
+    def __init__(self, fil):
+        self.terminal = sys.stdout
+        self.log = fil
+
+    def write(self, data):
+        self.terminal.write(data)
+        self.log.write(data)
+
 if __name__ == "__main__":
     import argparse
 
@@ -48,6 +58,8 @@ if __name__ == "__main__":
                    help="disk device stats to print")
     p.add_argument("-m", "--memory", action="store_true",
                    help="print memory bandwith stats using likwid-perfctr")
+    p.add_argument("-l", "--log", type=argparse.FileType('w'),
+                   help="log all data to the specified file")
     p.add_argument("-r", "--rnic", default=[], action="append",
                    help="RNIC device stats to print")
     p.add_argument("-s", "--switchtec", default=[], action="append",
@@ -55,6 +67,10 @@ if __name__ == "__main__":
     p.add_argument("-t", "--time", default=2.0,
                    help="time between printing samples")
     args = p.parse_args()
+
+    logfile = sys.stdout
+    if args.log:
+        logfile = Logger(args.log)
 
     try:
         timelines = []
@@ -86,14 +102,18 @@ if __name__ == "__main__":
                 while True:
                     timelines[0].wait_until_ready()
 
-                    print(time.asctime())
                     print_hostinfo()
-                    print()
-                    print()
 
-                    for tl in timelines:
+                    with contextlib.redirect_stdout(logfile):
+                        print(time.asctime())
+
+                        for tl in timelines:
+                            print()
+                            tl.print_next()
+
                         print()
-                        tl.print_next()
+                        print()
+                        print()
 
                     scr.clear()
 
