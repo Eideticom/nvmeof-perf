@@ -63,7 +63,6 @@ class LikwidTimeline(proc.ProcRunner):
         self.args = ["-f", "-g", group, "-c", cpu, "-O"]
         data = sp.check_output(self.exe + self.args + ["-S", "10ms"])
         self.args += ["-t", "{}s".format(period)]
-
         cdata = csv.reader(StringIO(data.decode()), delimiter=",")
 
         for row in cdata:
@@ -115,10 +114,12 @@ class LikwidTimeline(proc.ProcRunner):
         return ret
 
     def process_line(self, line):
-        if not line.startswith("1 "):
+        if line.startswith("1 "):
+            cols = line.split()
+        elif line.startswith("1,"):
+            cols = line.split(",")
+        else:
             return
-
-        cols = line.split()
 
         group_id = int(cols.pop(0))
         events = int(cols.pop(0))
