@@ -15,10 +15,9 @@
 ##
 ########################################################################
 
-import re
-import proc
-import likwid
+from . import proc, likwid
 
+import re
 from itertools import repeat, chain
 
 class MBWRunner(proc.ProcRunner):

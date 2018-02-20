@@ -26,11 +26,8 @@
 ##
 ########################################################################
 
-import fio
-import ibperftest
-import mbw
-import proc
-from suffix import parse_suffix, Suffix
+from nvmeof_perf import fio, ibperftest, mbw, proc
+from nvmeof_perf.suffix import parse_suffix, Suffix
 
 import os
 import sys

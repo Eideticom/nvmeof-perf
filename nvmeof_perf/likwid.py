@@ -15,9 +15,8 @@
 ##
 ########################################################################
 
-import colours
-import proc
-from suffix import Suffix
+from . import colours, proc
+from .suffix import Suffix
 
 import csv
 import re

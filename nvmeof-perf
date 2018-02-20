@@ -15,12 +15,7 @@
 ##
 ########################################################################
 
-import cpustats
-import iostats
-import likwid
-import rnic
-import switchtec
-import utils
+from nvmeof_perf import cpustats, iostats, likwid, rnic, switchtec, utils
 
 import re
 import sys

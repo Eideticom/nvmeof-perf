@@ -15,9 +15,7 @@
 ##
 ########################################################################
 
-import likwid
-import proc
-import suffix
+from . import likwid, proc, suffix
 
 import re
 import threading

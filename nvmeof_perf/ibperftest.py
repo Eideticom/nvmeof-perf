@@ -15,8 +15,7 @@
 ##
 ########################################################################
 
-import likwid
-import proc
+from . import likwid, proc
 
 import re
 import threading

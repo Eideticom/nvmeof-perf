@@ -14,9 +14,8 @@
 ##
 ########################################################################
 
-import colours
-import utils
-from suffix import Suffix
+from . import colours, utils
+from .suffix import Suffix
 
 import os
 
