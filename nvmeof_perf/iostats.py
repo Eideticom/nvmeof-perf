@@ -95,9 +95,9 @@ class IoStatsTimeline(utils.Timeline):
             write = s.write_sectors * 512
             ios = s.reads + s.writes
 
-            read_rate = read / (s.read_ms * 1e-3) if s.read_ms else 0
-            write_rate = write / (s.write_ms * 1e-3) if s.write_ms else 0
-            io_rate = (ios / (s.io_ms * 1e-3) if s.io_ms else 0)
+            read_rate = read / self.duration if self.duration else 0
+            write_rate = write / self.duration if self.duration else 0
+            io_rate = (ios / self.duration) if self.duration else 0
 
             ret[d] = (read, read_rate, write, write_rate, ios, io_rate)
 

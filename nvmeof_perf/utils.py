@@ -32,6 +32,8 @@ class Timeline(DummyContext):
 
         self.period = period
         self.last_time = time.time() - period
+        self.duration = None
+        self.first = True
 
     def wait_until_ready(self):
         tm = self.last_time + self.period
@@ -40,6 +42,9 @@ class Timeline(DummyContext):
 
     def next(self):
         self.wait_until_ready()
+        if not self.first:
+            self.duration = time.time() - self.last_time
+        self.first = False
         self.last_time = time.time()
 
 class CursesContext(object):
