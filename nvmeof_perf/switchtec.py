@@ -128,7 +128,8 @@ class Switchtec(object):
             raise SwitchtecError(devpath)
 
     def __del__(self):
-        swlib.switchtec_close(self.dev)
+        if getattr(self, "dev", None) is not None:
+            swlib.switchtec_close(self.dev)
 
     def status(self):
         st = SwitchtecStatusPtr()
