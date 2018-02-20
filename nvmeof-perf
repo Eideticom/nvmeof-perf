@@ -76,7 +76,7 @@ if __name__ == "__main__":
                    help="RNIC device stats to print")
     p.add_argument("-s", "--switchtec", default=[], action="append",
                    help="Switchtec devices to print")
-    p.add_argument("-t", "--time", default=2.0,
+    p.add_argument("-t", "--time", default=2.0, type=float,
                    help="time between printing samples")
     args = p.parse_args()
 
