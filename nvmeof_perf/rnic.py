@@ -59,16 +59,18 @@ def rnic_port_dir_stats(device, ports_dir):
     for p in sorted(os.listdir(ports_dir)):
         tx = os.path.join(ports_dir, p, "hw_counters", "tx_bytes")
         rx = os.path.join(ports_dir, p, "hw_counters", "tx_bytes")
+        mult = 1
 
         if not os.path.exists(tx) or not os.path.exists(rx):
             tx = os.path.join(ports_dir, p, "counters", "port_xmit_data")
             rx = os.path.join(ports_dir, p, "counters", "port_rcv_data")
+            mult = 4
 
         if not os.path.exists(tx) or not os.path.exists(rx):
             raise RNICException("Stats files not found for device '{}'".
                                 format(device))
 
-        ret.add_port(p, int(_readfile(tx)), int(_readfile(rx)))
+        ret.add_port(p, int(_readfile(tx)) * mult, int(_readfile(rx)) * mult)
 
     return ret
 
