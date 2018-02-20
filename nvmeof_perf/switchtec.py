@@ -169,7 +169,6 @@ class SwitchtecTimeline(Switchtec, utils.Timeline):
         self.port_ids = [s.port.phys_id for s in st]
 
         self.names = [self.get_name(s) for s in st]
-
         self.last = None
 
     def get_name(self, st):
@@ -184,7 +183,7 @@ class SwitchtecTimeline(Switchtec, utils.Timeline):
             return ", ".join(classes)
 
         if st.pci_dev:
-            return st.pci_dev
+            return st.pci_dev.strip().decode()
 
         return "Port {}".format(st.port.log_id)
 
