@@ -19,7 +19,7 @@ from .suffix import Suffix
 
 import os
 
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 class CpuStats(namedtuple("CpuStats", ["user", "system", "idle",
                                        "iowait", "total", "intr", "ctxt",
@@ -96,7 +96,23 @@ class CpuTimeline(utils.Timeline):
 
         self.last = stats_new
 
-        return stats
+        ret = OrderedDict()
+
+        def set_ret(typ):
+            ret[typ] = getattr(stats, typ)
+            ret[typ + "_pct"] = getattr(stats, typ) / stats.total
+
+        set_ret("idle")
+        set_ret("user")
+        set_ret("system")
+        set_ret("iowait")
+
+        ret["mem_used"] = stats.mem_used
+        ret["mem_used_pct"] = stats.mem_used / stats.mem_total
+        ret["intr"] = stats.intr
+        ret["ctxt"] = stats.ctxt
+
+        return ret
 
     def print_next(self, indent=""):
         stats = self.next()
@@ -106,23 +122,22 @@ class CpuTimeline(utils.Timeline):
 
         def print_line(typ):
             print("{}{:<35} {:>9.1f}  \t{:>7.1%}".
-                  format(indent, typ.title() + ":", getattr(stats, typ),
-                         getattr(stats, typ) / stats.total))
+                  format(indent, typ.title() + ":", stats[typ],
+                         stats[typ + "_pct"]))
 
         print_line("idle")
         print_line("user")
         print_line("system")
         print_line("iowait")
 
-        mem_used = Suffix(stats.mem_used)
+        mem_used = Suffix(stats["mem_used"])
 
         print("{}{:<35} {:>9.1f}  \t{:>7.1%}".
-              format(indent, "Memory Used:", mem_used,
-                     stats.mem_used / stats.mem_total))
+              format(indent, "Memory Used:", mem_used, stats["mem_used_pct"]))
         print("{}{:<35} {:>9d}".
-              format(indent, "Interrupts:", stats.intr))
+              format(indent, "Interrupts:", stats["intr"]))
         print("{}{:<35} {:>9d}".
-              format(indent, "Ctx Switches:", stats.ctxt))
+              format(indent, "Ctx Switches:", stats["ctxt"]))
 
 if __name__ == "__main__":
     import time
