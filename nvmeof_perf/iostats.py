@@ -83,7 +83,8 @@ class IoStatsTimeline(utils.Timeline):
         stats_new = iostats_stats(self.devices)
 
         if self.last:
-            stats = {d: a - self.last[d] for d, a in stats_new.items()}
+            stats = OrderedDict((d, a - self.last[d])
+                                for d, a in stats_new.items())
         else:
             stats = stats_new
 
@@ -100,6 +101,10 @@ class IoStatsTimeline(utils.Timeline):
             io_rate = (ios / self.duration) if self.duration else 0
 
             ret[d] = (read, read_rate, write, write_rate, ios, io_rate)
+
+        self.latest = ret
+        self.latest_titles = ("read", "read_rate", "write", "write_rate",
+                              "ios", "io_rate")
 
         return ret
 
@@ -127,10 +132,17 @@ class IoStatsTimeline(utils.Timeline):
             print("{}{:<30} ios:   {:>7.1f}  \t{:>7.1f}".
                   format(indent, "", io, io_rate))
 
+    def csv(self):
+        return tuple(x for y in self.latest.values() for x in y)
+
+    def csv_titles(self):
+        return tuple("{}:{}".format(n, x) for n in self.latest.keys() for x in
+                     self.latest_titles)
+
 if __name__ == "__main__":
     import time
 
-    tl = IoStatsTimeline(period=2.0, devices=["/dev/nvme0n1"])
+    tl = IoStatsTimeline(period=2.0, devices=["/dev/nvme0n1", "/dev/sda"])
 
     while True:
         print(time.asctime())

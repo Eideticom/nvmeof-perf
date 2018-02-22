@@ -139,7 +139,8 @@ class LikwidTimeline(proc.ProcRunner):
         self.queue.put(cpus)
 
     def next(self):
-        return self.queue.get()
+        self.latest = self.queue.get()
+        return self.latest
 
     def print_next(self, indent=""):
         stats = self.next()
@@ -158,6 +159,13 @@ class LikwidTimeline(proc.ProcRunner):
                   format(indent, cname, read, read_bw))
             print("{}{:<30} write: {:>7.1f}  \t{:>7.1f}".
                   format(indent, "", write, write_bw))
+
+    def csv(self):
+        return tuple(x for y in self.latest for x in y.values())
+
+    def csv_titles(self):
+        return tuple("{}:{}".format(c, t) for c in self.cpus
+                     for t in self.latest[0].keys())
 
 def likwid_all_sockets():
     data = sp.check_output(["likwid-pin", "-p"]).decode()

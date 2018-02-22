@@ -122,6 +122,7 @@ class Switchtec(object):
             raise OSError("Unable to load libswitchtec.so")
 
         self.devpath = devpath
+        self.devname = os.path.basename(devpath)
 
         self.dev = swlib.switchtec_open(devpath.encode())
         if not self.dev:
@@ -199,27 +200,26 @@ class SwitchtecTimeline(Switchtec, utils.Timeline):
 
         self.last = bwdata_new
 
-        byte_counts = OrderedDict()
+        ret = OrderedDict()
         for n, bw in zip(self.names, bwdata):
-            byte_counts[n] = (bw.ingress.total(), bw.egress.total())
+            ret[n] = (bw.ingress.total(), bw.egress.total(),
+                      bw.ingress.total() / bw.time(),
+                      bw.egress.total() / bw.time())
 
-        rates = OrderedDict()
-        for n, bw in zip(self.names, bwdata):
-            rates[n] = (bw.ingress.total() / bw.time(),
-                        bw.egress.total() / bw.time())
+        self.latest = ret
+        self.latest_titles = ("ingress", "egress", "ingress_rate",
+                              "egress_rate")
 
-
-        return byte_counts, rates
+        return ret
 
     def print_next(self, indent=""):
-        bytes, rates = self.next()
+        stats = self.next()
 
         print("{}{c.bold}Switchtec PCI Stats for {}{c.rst}:".
               format(indent, os.path.basename(self.devpath), c=colours))
         indent += "  "
 
-        for (n, (ing, eg)), (_, (ing_rate, eg_rate)) in zip(bytes.items(),
-                                                            rates.items()):
+        for (n, (ing, eg, ing_rate, eg_rate)) in stats.items():
             ing = Suffix(ing)
             eg = Suffix(eg)
             ing_rate = Suffix(ing_rate, "B/s")
@@ -232,6 +232,14 @@ class SwitchtecTimeline(Switchtec, utils.Timeline):
             print("{}{:<30} out:   {:>7.1f}  \t{:>7.1f}".
                   format(indent, "",  eg, eg_rate))
 
+    def csv(self):
+        return tuple(x for y in self.latest.values() for x in y)
+
+    def csv_titles(self):
+        return tuple("{}:{}:{}".format(self.devname, k, t)
+                     for k in self.latest.keys()
+                     for t in self.latest_titles)
+
 if __name__ == "__main__":
     import time
 
@@ -240,5 +248,6 @@ if __name__ == "__main__":
     while True:
         print(time.asctime())
         sw.print_next();
+        print(sw.csv_titles())
         print()
         print()

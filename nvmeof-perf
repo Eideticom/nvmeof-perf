@@ -17,6 +17,7 @@
 
 from nvmeof_perf import cpustats, iostats, likwid, rnic, switchtec, utils
 
+import csv
 import re
 import sys
 import time
@@ -62,10 +63,30 @@ class Logger(object):
         self.terminal.write(data)
         self.log.write(self.ansi_escape.sub("", data))
 
+class CsvWriter(object):
+    def __init__(self, f):
+        self.csv = csv.writer(f)
+        self.first = True
+
+    def write_header(self, timelines):
+        fieldnames = tuple(n for tl in timelines for n in tl.csv_titles())
+        self.csv.writerow(fieldnames)
+
+    def write_timelines(self, timelines):
+        if self.first:
+            self.write_header(timelines)
+
+        row = tuple(x for tl in timelines for x in tl.csv())
+        self.csv.writerow(row)
+
+        self.first = False
+
 if __name__ == "__main__":
     import argparse
 
     p = argparse.ArgumentParser()
+    p.add_argument("-c", "--csv", type=argparse.FileType('w'),
+                   help="log all data to a specified csv file")
     p.add_argument("-d", "--disk", default=[], action="append",
                    help="disk device stats to print")
     p.add_argument("-m", "--memory", action="store_true",
@@ -83,6 +104,10 @@ if __name__ == "__main__":
     logfile = sys.stdout
     if args.log:
         logfile = Logger(args.log)
+
+    csvfile = None
+    if args.csv:
+        csvfile = CsvWriter(args.csv)
 
     try:
         timelines = []
@@ -126,6 +151,9 @@ if __name__ == "__main__":
                         print()
                         print()
                         print()
+
+                        if csvfile:
+                            csvfile.write_timelines(timelines)
 
                     scr.clear()
 

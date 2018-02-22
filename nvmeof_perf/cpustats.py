@@ -112,6 +112,8 @@ class CpuTimeline(utils.Timeline):
         ret["intr"] = stats.intr
         ret["ctxt"] = stats.ctxt
 
+        self.latest = ret
+
         return ret
 
     def print_next(self, indent=""):
@@ -138,6 +140,12 @@ class CpuTimeline(utils.Timeline):
               format(indent, "Interrupts:", stats["intr"]))
         print("{}{:<35} {:>9d}".
               format(indent, "Ctx Switches:", stats["ctxt"]))
+
+    def csv(self):
+        return self.latest.values()
+
+    def csv_titles(self):
+        return self.latest.keys()
 
 if __name__ == "__main__":
     import time

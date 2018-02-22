@@ -125,6 +125,9 @@ class RnicTimeline(utils.Timeline):
 
             ret[d] = tx, rx, tx_rate, rx_rate
 
+        self.latest = ret
+        self.latest_titles = ["tx", "rx", "tx_rate", "rx_rate"]
+
         return ret
 
     def print_next(self, indent=""):
@@ -143,6 +146,14 @@ class RnicTimeline(utils.Timeline):
                   format(indent, d, tx, tx_rate))
             print("{}{:<30} rx:    {:>7.1f}  \t{:>7.1f}".
                   format(indent, "", rx, rx_rate))
+
+    def csv(self):
+        return tuple(x for y in self.latest.values() for x in y)
+
+    def csv_titles(self):
+        return tuple("{}:{}".format(n, x) for n in self.latest.keys() for x in
+                     self.latest_titles)
+
 
 if __name__ == "__main__":
     import time
