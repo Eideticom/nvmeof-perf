@@ -70,6 +70,7 @@ class CsvWriter(object):
 
     def write_header(self, timelines):
         fieldnames = tuple(n for tl in timelines for n in tl.csv_titles())
+        fieldnames = ('timestamp', ) + fieldnames
         self.csv.writerow(fieldnames)
 
     def write_timelines(self, timelines):
@@ -77,6 +78,7 @@ class CsvWriter(object):
             self.write_header(timelines)
 
         row = tuple(x for tl in timelines for x in tl.csv())
+        row = (time.time(), ) + row
         self.csv.writerow(row)
 
         self.first = False
