@@ -188,6 +188,6 @@ class TimeProcessLineMixin(object):
                                                 self.time_stats["real"]) * 100
 
 class TimeMixin(TimeProcessLineMixin):
-    def __init__(self, group="MEM", cpu="S0:0", *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(TimeMixin, self).__init__(*args, **kwargs)
         self.exe = ["time", "-p"] + self.exe
