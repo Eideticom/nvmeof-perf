@@ -139,7 +139,8 @@ if __name__ == "__main__":
                 scr.clear()
 
                 while True:
-                    timelines[0].wait_until_ready()
+                    for tl in timelines:
+                        tl.wait_until_ready()
 
                     print_hostinfo()
 
