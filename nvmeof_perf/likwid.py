@@ -66,7 +66,7 @@ class _LikwidGroup(object):
         self.cpus = [c for c in next(cdata)[1:] if c]
 
         for row in cdata:
-            if row[0] == "TABLE":
+            if row[0] == "TABLE" or row[0] == "STRUCT":
                 break
 
             m = self.col_re.match(row[0])
