@@ -101,6 +101,8 @@ if __name__ == "__main__":
                    help="Switchtec devices to print")
     p.add_argument("-t", "--time", default=2.0, type=float,
                    help="time between printing samples")
+    p.add_argument("-u", "--runtime", default=0, type=float,
+                   help="runtime of program")
     args = p.parse_args()
 
     logfile = sys.stdout
@@ -138,7 +140,8 @@ if __name__ == "__main__":
             with utils.CursesContext() as scr:
                 scr.clear()
 
-                while True:
+                start_time = time.time()
+                while args.runtime <= 0 or time.time() - start_time < args.runtime:
                     for tl in timelines:
                         tl.wait_until_ready()
 
