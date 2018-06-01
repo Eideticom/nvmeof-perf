@@ -169,12 +169,13 @@ class SwitchtecTimeline(Switchtec, utils.Timeline):
         st = self.status()
         self.port_ids = [s.port.phys_id for s in st if s.link_up]
 
+        self.upstream_cnt = 0
         self.names = [self.get_name(s) for s in st if s.link_up]
         self.last = None
 
     def get_name(self, st):
         if st.port.upstream:
-            return "upstream"
+            return "upstream {}".format(st.port.partition)
 
         if st.class_devices:
             classes = [c.strip() for c in st.class_devices.split(b",")]
