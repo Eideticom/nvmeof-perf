@@ -167,9 +167,9 @@ class SwitchtecTimeline(Switchtec, utils.Timeline):
         super().__init__(*args, **kwargs)
 
         st = self.status()
-        self.port_ids = [s.port.phys_id for s in st]
+        self.port_ids = [s.port.phys_id for s in st if s.link_up]
 
-        self.names = [self.get_name(s) for s in st]
+        self.names = [self.get_name(s) for s in st if s.link_up]
         self.last = None
 
     def get_name(self, st):
