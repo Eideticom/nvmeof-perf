@@ -15,7 +15,7 @@
 ##
 ########################################################################
 
-from nvmeof_perf import cpustats, iostats, likwid, rnic, switchtec, utils
+from nvmeof_perf import cpustats, iostats, likwid, rnic, switchtec, utils, mbw
 
 import csv
 import re
@@ -93,6 +93,8 @@ if __name__ == "__main__":
                    help="disk device stats to print")
     p.add_argument("-m", "--memory", action="store_true",
                    help="print memory bandwith stats using likwid-perfctr")
+    p.add_argument("-M", "--background-memory", action="store_true",
+                   help="print memory bandwidth of a background mbw task")
     p.add_argument("-l", "--log", type=argparse.FileType('w'),
                    help="log all data to the specified file")
     p.add_argument("-r", "--rnic", default=[], action="append",
@@ -123,6 +125,9 @@ if __name__ == "__main__":
 
         if args.memory:
             add_timeline(likwid.LikwidTimeline)
+
+        if args.background_memory:
+            add_timeline(mbw.MBWTimeline)
 
         if args.disk:
             add_timeline(iostats.IoStatsTimeline, devices=args.disk)
