@@ -67,15 +67,12 @@ class ProcRunner(threading.Thread):
         try:
             master, slave = pty.openpty()
             self.slave = slave
-            try:
-                self.p = sp.Popen(self.exe + self.args,
+
+            self.p = sp.Popen(self.exe + self.args,
                                   stdin=sp.PIPE,
                                   stdout=slave,
                                   stderr=slave,
                                   preexec_fn=os.setsid)
-            except OSError as e:
-                e.filename = self.exe[0]
-                raise
 
             mf = os.fdopen(master, "U")
 
@@ -91,19 +88,15 @@ class ProcRunner(threading.Thread):
                     print("Exception occured while processing line:")
                     traceback.print_exc()
 
-        except IOError:
-            self.finish()
         except Exception as e:
             self.started.set()
             self.exception = sys.exc_info()
-
 
     def check_started(self):
         self.started.wait(2)
         if self.exception:
             self.join(5)
-            traceback.print_exception(*self.exception)
-            sys.exit(1)
+            raise self.exception[1]
 
     def start(self):
         super(ProcRunner, self).start()
